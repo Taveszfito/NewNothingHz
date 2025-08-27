@@ -18,4 +18,4 @@ Nothing 120Hz Unlock — v2.0 (major update)
 
 -Stability and minor fixes.
 
-Download Link: https://www.mediafire.com/file/a3d17ss5igp796i/Nothing_Hz_Unlock_2.0.apk/file
+NOTE: Don’t forget to enable the 'Disable default frame rate for games' option in the developer settings for the application to work properly.
