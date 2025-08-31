@@ -1,3 +1,5 @@
 <resources>
-    <string name="app_name">Nothing 120hz Unlock</string>
+    <string name="app_name">Nothing120HzUnlock</string>
+    <string name="accessibility_desc">Automatikusan elrejti az overlayt, amikor engedélykérő ablak jelenik meg.</string>
+    <string name="accessibility_summary">Overlay automatikus szüneteltetése engedélykérésnél</string>
 </resources>

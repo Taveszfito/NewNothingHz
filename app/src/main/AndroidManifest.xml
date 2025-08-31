@@ -1,10 +1,18 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
-    <!-- Engedélyek -->
+    <!-- Permissions -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- Package visibility: see launchable (LAUNCHER) apps for blacklist -->
+    <queries>
+        <intent>
+            <action android:name="android.intent.action.MAIN" />
+            <category android:name="android.intent.category.LAUNCHER" />
+        </intent>
+    </queries>
 
     <application
         android:allowBackup="true"
@@ -16,7 +24,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.Nothing120hzUnlock">
 
-        <!-- Fő Activity -->
+        <!-- Main Activity -->
         <activity
             android:name=".MainActivity"
             android:exported="true">
@@ -26,20 +34,19 @@
             </intent-filter>
         </activity>
 
-        <!-- Szolgáltatás a lebegő négyzethez -->
+        <!-- Foreground overlay service -->
         <service
             android:name=".FloatingService"
             android:enabled="true"
             android:exported="false" />
 
-        <!-- BootReceiver: csak akkor indul, ha a user bekapcsolta -->
+        <!-- BootReceiver -->
         <receiver
             android:name=".BootReceiver"
             android:enabled="true"
             android:exported="false">
             <intent-filter>
                 <action android:name="android.intent.action.BOOT_COMPLETED" />
-                <!-- ÚJ: Android 10+ esetre hasznos -->
                 <action android:name="android.intent.action.LOCKED_BOOT_COMPLETED" />
             </intent-filter>
         </receiver>
@@ -54,18 +61,37 @@
             </intent-filter>
         </service>
 
-        <!-- ÚJ: Accessibility Service a permission-panel figyeléséhez -->
+        <!-- ONE Accessibility Service that does BOTH:
+             - permission prompt auto-pause (régi funkció)
+             - foreground app reporting for blacklist (új funkció) -->
         <service
             android:name=".PermissionWatcherService"
-            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE"
-            android:exported="false">
+            android:exported="false"
+            android:permission="android.permission.BIND_ACCESSIBILITY_SERVICE">
             <intent-filter>
-                <action android:name="android.accessibilityservice.AccessibilityService"/>
+                <action android:name="android.accessibilityservice.AccessibilityService" />
             </intent-filter>
             <meta-data
                 android:name="android.accessibilityservice"
-                android:resource="@xml/permission_watcher_config"/>
+                android:resource="@xml/permission_watcher_config" />
         </service>
+
+        <!-- PolicyReceiver: start/stop overlay based on rules -->
+        <receiver
+            android:name=".policy.PolicyReceiver"
+            android:exported="false">
+            <intent-filter>
+                <!-- Battery Saver mode toggled -->
+                <action android:name="android.os.action.POWER_SAVE_MODE_CHANGED" />
+                <!-- Power connected/disconnected (nice trigger for re-eval) -->
+                <action android:name="android.intent.action.ACTION_POWER_CONNECTED" />
+                <action android:name="android.intent.action.ACTION_POWER_DISCONNECTED" />
+                <!-- Foreground app changed (from Accessibility) -->
+                <action android:name="com.nothing120hzunlock.TOP_APP_CHANGED" />
+                <!-- Manual re-eval from UI -->
+                <action android:name="com.nothing120hzunlock.ACTION_EVAL_POLICY" />
+            </intent-filter>
+        </receiver>
 
     </application>
 </manifest>

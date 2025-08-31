@@ -2,6 +2,7 @@
 <androidx.core.widget.NestedScrollView
     xmlns:android="http://schemas.android.com/apk/res/android"
     xmlns:app="http://schemas.android.com/apk/res-auto"
+    xmlns:tools="http://schemas.android.com/tools"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:fillViewport="true"
@@ -184,7 +185,7 @@
                     <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnRequestOverlay"
                         android:text="Request overlay permission"
-                        style="@style/Widget.Material3.Button"
+                        style="@style/Widget.Material3.Button.TonalButton"
                         android:layout_marginTop="8dp"
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content" />
@@ -215,6 +216,243 @@
                 </LinearLayout>
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
+
+        <!-- BATTERY SAVING (collapsible) -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="3dp">
+
+            <LinearLayout
+                android:orientation="vertical"
+                android:padding="12dp"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <!-- Header: tap to expand/collapse -->
+                <LinearLayout
+                    android:id="@+id/batteryHeader"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:padding="4dp"
+                    android:foreground="?attr/selectableItemBackground"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:text="Battery Saving"
+                        android:textStyle="bold"
+                        android:textSize="18sp"
+                        android:fontFamily="@font/nothingdot"
+                        android:layout_weight="1"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content" />
+
+                    <ImageView
+                        android:id="@+id/batteryChevron"
+                        android:src="@android:drawable/arrow_down_float"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp" />
+                </LinearLayout>
+
+                <!-- Content -->
+                <LinearLayout
+                    android:id="@+id/batteryContent"
+                    android:orientation="vertical"
+                    android:visibility="gone"
+                    android:layout_marginTop="8dp"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <!-- Disable overlay on Battery Saver -->
+                    <LinearLayout
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content">
+
+                        <com.google.android.material.textview.MaterialTextView
+                            android:text="Disable overlay when Battery Saver is active"
+                            android:textSize="15sp"
+                            android:layout_weight="1"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"/>
+
+                        <com.google.android.material.switchmaterial.SwitchMaterial
+                            android:id="@+id/switchPauseOnSaver"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content" />
+                    </LinearLayout>
+
+                    <!-- Threshold label -->
+                    <com.google.android.material.textview.MaterialTextView
+                        android:layout_marginTop="12dp"
+                        android:text="Auto-disable overlay when battery is below"
+                        android:textSize="15sp"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+
+                    <!-- Slider + live value -->
+                    <LinearLayout
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginTop="4dp"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content">
+
+                        <com.google.android.material.slider.Slider
+                            android:id="@+id/sliderBatteryThreshold"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content"
+                            android:layout_weight="1"
+                            android:valueFrom="0"
+                            android:valueTo="50"
+                            android:stepSize="5"
+                            android:value="0" />
+
+                        <com.google.android.material.textview.MaterialTextView
+                            android:id="@+id/textBatteryThresholdValue"
+                            android:layout_marginStart="12dp"
+                            android:text="0%"
+                            android:textSize="13sp"
+                            android:textColor="?android:attr/textColorSecondary"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content" />
+                    </LinearLayout>
+
+                    <!-- Helper text -->
+                    <com.google.android.material.textview.MaterialTextView
+                        android:id="@+id/textBatteryThresholdHint"
+                        android:layout_marginTop="4dp"
+                        android:text="(Set to 0% to turn this feature off.)"
+                        android:textSize="13sp"
+                        android:textColor="?android:attr/textColorSecondary"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
+        <!-- APP BLACKLIST (collapsible) -->
+        <com.google.android.material.card.MaterialCardView
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            app:cardCornerRadius="16dp"
+            app:cardElevation="3dp">
+
+            <LinearLayout
+                android:orientation="vertical"
+                android:padding="12dp"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content">
+
+                <!-- Header: tap to expand/collapse -->
+                <LinearLayout
+                    android:id="@+id/blacklistHeader"
+                    android:orientation="horizontal"
+                    android:gravity="center_vertical"
+                    android:padding="4dp"
+                    android:foreground="?attr/selectableItemBackground"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <com.google.android.material.textview.MaterialTextView
+                        android:text="App Blacklist"
+                        android:textStyle="bold"
+                        android:textSize="18sp"
+                        android:fontFamily="@font/nothingdot"
+                        android:layout_weight="1"
+                        android:layout_width="0dp"
+                        android:layout_height="wrap_content" />
+
+                    <ImageView
+                        android:id="@+id/blacklistChevron"
+                        android:src="@android:drawable/arrow_down_float"
+                        android:layout_width="24dp"
+                        android:layout_height="24dp" />
+                </LinearLayout>
+
+                <!-- Content -->
+                <LinearLayout
+                    android:id="@+id/blacklistContent"
+                    android:orientation="vertical"
+                    android:visibility="gone"
+                    android:layout_marginTop="8dp"
+                    android:layout_width="match_parent"
+                    android:layout_height="wrap_content">
+
+                    <!-- Info note -->
+                    <com.google.android.material.textview.MaterialTextView
+                        android:id="@+id/textBlacklistInfo"
+                        android:text="Overlay will automatically pause in the apps you select below."
+                        android:textSize="14sp"
+                        android:textColor="?android:attr/textColorSecondary"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+
+                    <!-- Search -->
+                    <com.google.android.material.textfield.TextInputLayout
+                        android:layout_marginTop="12dp"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content">
+
+                        <com.google.android.material.textfield.TextInputEditText
+                            android:id="@+id/inputBlacklistSearch"
+                            android:hint="Search apps (name or package)"
+                            android:imeOptions="actionSearch"
+                            android:singleLine="true"
+                            android:layout_width="match_parent"
+                            android:layout_height="wrap_content" />
+                    </com.google.android.material.textfield.TextInputLayout>
+
+                    <!-- Show system apps -->
+                    <LinearLayout
+                        android:orientation="horizontal"
+                        android:gravity="center_vertical"
+                        android:layout_marginTop="8dp"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content">
+
+                        <com.google.android.material.textview.MaterialTextView
+                            android:text="Show system apps"
+                            android:textSize="15sp"
+                            android:layout_weight="1"
+                            android:layout_width="0dp"
+                            android:layout_height="wrap_content" />
+
+                        <com.google.android.material.switchmaterial.SwitchMaterial
+                            android:id="@+id/switchShowSystemApps"
+                            android:layout_width="wrap_content"
+                            android:layout_height="wrap_content" />
+                    </LinearLayout>
+
+                    <!-- App list -->
+                    <androidx.recyclerview.widget.RecyclerView
+                        android:id="@+id/recyclerBlacklistApps"
+                        android:layout_marginTop="8dp"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content"
+                        android:nestedScrollingEnabled="false" />
+
+                    <!-- Empty state (shown when no results) -->
+                    <com.google.android.material.textview.MaterialTextView
+                        android:id="@+id/textBlacklistEmpty"
+                        android:visibility="gone"
+                        android:text="No apps match your search."
+                        android:textSize="14sp"
+                        android:textColor="?android:attr/textColorSecondary"
+                        android:layout_marginTop="8dp"
+                        android:layout_width="match_parent"
+                        android:layout_height="wrap_content" />
+
+                </LinearLayout>
+            </LinearLayout>
+        </com.google.android.material.card.MaterialCardView>
+
 
         <!-- ABOUT (kinyíló) -->
         <com.google.android.material.card.MaterialCardView
@@ -265,7 +503,7 @@
 
                     <com.google.android.material.textview.MaterialTextView
                         android:id="@+id/aboutText"
-                        android:text="Places an invisible layer aboove your screen to help maintain 120hz for apps and games on Nothing Phones. Pro tip: Add a Quick Settings tile for instant on/off from any screen"
+                        android:text="Places an invisible layer above your screen to help maintain 120hz for apps and games on Nothing Phones. Pro tip: Add a Quick Settings tile for instant on/off from any screen"
                         android:textSize="14sp"
                         android:textColor="?android:attr/textColorSecondary"
                         android:layout_width="match_parent"
@@ -348,6 +586,7 @@
             android:textColor="@android:color/darker_gray"
             android:gravity="center_horizontal"
             android:layout_marginTop="16dp"
-            android:layout_marginBottom="8dp" />
+            android:layout_marginBottom="8dp"
+            tools:ignore="HardcodedText" />
     </LinearLayout>
 </androidx.core.widget.NestedScrollView>
