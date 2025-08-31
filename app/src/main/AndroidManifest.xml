@@ -1,10 +1,17 @@
 <?xml version="1.0" encoding="utf-8"?>
-<manifest xmlns:android="http://schemas.android.com/apk/res/android">
+<manifest
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools">
 
     <!-- Permissions -->
     <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
     <uses-permission android:name="android.permission.REQUEST_IGNORE_BATTERY_OPTIMIZATIONS" />
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- Usage Access a stabil blacklisthez -->
+    <uses-permission
+        android:name="android.permission.PACKAGE_USAGE_STATS"
+        tools:ignore="ProtectedPermissions" />
 
     <!-- Package visibility: see launchable (LAUNCHER) apps for blacklist -->
     <queries>
@@ -62,8 +69,8 @@
         </service>
 
         <!-- ONE Accessibility Service that does BOTH:
-             - permission prompt auto-pause (régi funkció)
-             - foreground app reporting for blacklist (új funkció) -->
+             - permission prompt auto-pause
+             - foreground app reporting for blacklist -->
         <service
             android:name=".PermissionWatcherService"
             android:exported="false"
@@ -83,7 +90,7 @@
             <intent-filter>
                 <!-- Battery Saver mode toggled -->
                 <action android:name="android.os.action.POWER_SAVE_MODE_CHANGED" />
-                <!-- Power connected/disconnected (nice trigger for re-eval) -->
+                <!-- Power connected/disconnected -->
                 <action android:name="android.intent.action.ACTION_POWER_CONNECTED" />
                 <action android:name="android.intent.action.ACTION_POWER_DISCONNECTED" />
                 <!-- Foreground app changed (from Accessibility) -->

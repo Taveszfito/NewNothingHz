@@ -17,14 +17,17 @@ class PermissionWatcherService : AccessibilityService() {
         private const val ACTION_PAUSE  = "com.nothing120hzunlock.ACTION_OVERLAY_PAUSE"
         private const val ACTION_RESUME = "com.nothing120hzunlock.ACTION_OVERLAY_RESUME"
 
-        private const val BASE_HOLD_MS = 2000L   // minimum ennyi ideig maradjon off
+        const val ACTION_TOP_APP = "com.nothing120hzunlock.TOP_APP_CHANGED"
+        const val EXTRA_PKG = "pkg"
 
-        private const val HOLD_EXTEND_MS = 800L  // minden új jelre hosszabbítsunk
-
+        private const val BASE_HOLD_MS = 2000L
+        private const val HOLD_EXTEND_MS = 800L
         private const val MIN_TOGGLE_INTERVAL_MS = 200L
         private const val CLEAR_STABLE_MS = 500L
 
-        // Rendszer/OEM engedély- és special access UI-k csomagnevei
+        private const val TOP_STABLE_MS = 180L            // ennyi ideig legyen stabil a jelölt
+        private val IGNORED_PKGS = setOf("com.android.systemui")
+
         private val PERMISSION_PACKAGES = setOf(
             "com.android.permissioncontroller",
             "com.google.android.permissioncontroller",
@@ -41,42 +44,22 @@ class PermissionWatcherService : AccessibilityService() {
             "com.huawei.systemmanager"
         )
 
-        // Beállítások appok: csak osztálymintával együtt legyenek gyanúsak
         private val SETTINGS_REQUIRE_CLASS = setOf(
             "com.android.settings",
             "com.samsung.android.settings",
             "com.nothing.settings"
         )
 
-        // Böngészők, amik gyakran saját előszűrő/permission dialógust dobnak
         private val CHROMIUM_PKGS = setOf(
-            // Google Chrome
             "com.android.chrome","com.chrome.beta","com.chrome.dev","com.chrome.canary",
-            // Brave
-            "com.brave.browser",
-            // Edge
-            "com.microsoft.emmx",
-            // Opera
+            "com.brave.browser","com.microsoft.emmx",
             "com.opera.browser","com.opera.mini.native","com.opera.gx",
-            // Vivaldi
             "com.vivaldi.browser","com.vivaldi.browser.snapshot",
-            // Samsung Internet
-            "com.sec.android.app.sbrowser",
-            // Kiwi
-            "org.kiwibrowser.browser",
-            // Yandex
-            "com.yandex.browser",
-            // DuckDuckGo
-            "com.duckduckgo.mobile.android",
-            // Ecosia
-            "com.ecosia.android",
-            // Xiaomi Mi Browser
-            "com.mi.globalbrowser","com.miui.browser",
-            // Naver Whale
-            "com.naver.whale"
+            "com.sec.android.app.sbrowser","org.kiwibrowser.browser",
+            "com.yandex.browser","com.duckduckgo.mobile.android","com.ecosia.android",
+            "com.mi.globalbrowser","com.miui.browser","com.naver.whale"
         )
 
-        // Osztálynév-részletek engedély/special access UI-khoz
         private val PERMISSION_CLASS_HINTS = arrayOf(
             "GrantPermissions","ReviewPermissions","ManagePermissions",
             "PermissionActivity","PermissionController","PermissionDialog",
@@ -88,39 +71,76 @@ class PermissionWatcherService : AccessibilityService() {
     }
 
     private val main = Handler(Looper.getMainLooper())
+
     private var isPaused = false
     private var lastToggleAt = 0L
     private var clearSince = 0L
-
     private var pauseUntil = 0L
 
     private var lastEventPkg = ""
     private var lastEventCls = ""
+    private var lastTopPkgBroadcasted: String? = null
 
-    override fun onServiceConnected() {
-        Log.d(TAG, "connected")
-    }
+    // debounce a top-app észleléshez
+    private var pendingPkg: String? = null
+    private var pendingToken = 0
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         event ?: return
-        if (!isPermWatchOn()) return
 
         when (event.eventType) {
             AccessibilityEvent.TYPE_WINDOW_STATE_CHANGED,
-            AccessibilityEvent.TYPE_WINDOWS_CHANGED -> {
+            AccessibilityEvent.TYPE_WINDOWS_CHANGED,
+            AccessibilityEvent.TYPE_VIEW_FOCUSED -> {
+                // 1) Ütemezett, stabil top-app észlelés
+                scheduleTopAppCandidate(event.packageName?.toString())
+
+                // 2) Permission prompt auto-pause (csak ha bekapcsoltad)
                 lastEventPkg = event.packageName?.toString().orEmpty()
                 lastEventCls = event.className?.toString().orEmpty()
-                recomputeState()
+                if (isPermWatchOn()) recomputeState()
             }
         }
+    }
+
+    private fun scheduleTopAppCandidate(fromEventPkg: String?) {
+        val candidate = (fromEventPkg ?: rootInActiveWindow?.packageName?.toString()).orEmpty()
+        if (candidate.isEmpty() || candidate in IGNORED_PKGS) return
+
+        pendingPkg = candidate
+        val myToken = ++pendingToken
+
+        // töröld a korábbi ütemezést, majd 180 ms múlva ellenőrizzünk
+        main.removeCallbacksAndMessages("top")
+        main.postAtTime({
+            // ha közben jött újabb jelölt, ezt hagyjuk
+            if (myToken != pendingToken) return@postAtTime
+
+            // végső ellenőrzés az aktuális rootból
+            val stable = rootInActiveWindow?.packageName?.toString().orEmpty()
+            val pkg = (if (stable.isNotEmpty()) stable else candidate)
+            if (pkg.isEmpty() || pkg == lastTopPkgBroadcasted || pkg in IGNORED_PKGS) return@postAtTime
+
+            lastTopPkgBroadcasted = pkg
+            sendBroadcast(
+                Intent(ACTION_TOP_APP).setPackage(packageName).putExtra(EXTRA_PKG, pkg)
+            )
+            sendBroadcast(
+                Intent("com.nothing120hzunlock.ACTION_EVAL_POLICY").setPackage(packageName)
+            )
+            Log.d(TAG, "Top app: $pkg")
+        }, "top", System.currentTimeMillis() + TOP_STABLE_MS)
     }
 
     override fun onInterrupt() {}
 
     override fun onDestroy() {
+        main.removeCallbacksAndMessages("top")
         if (isPaused) sendBroadcast(Intent(ACTION_RESUME).setPackage(packageName))
         super.onDestroy()
     }
+
+    // —— Permission-UI auto-pause —— //
 
     private fun recomputeState() {
         val now = System.currentTimeMillis()
@@ -130,19 +150,16 @@ class PermissionWatcherService : AccessibilityService() {
                     fallbackTextHeuristic()
 
         if (visible) {
-            // első jelre hosszú hold, további jelekre rövid hosszabbítás
             pauseUntil = max(pauseUntil, now + if (isPaused) HOLD_EXTEND_MS else BASE_HOLD_MS)
             clearSince = 0L
             if (!isPaused) toggle(true)
         } else {
             if (clearSince == 0L) clearSince = now
-            // csak akkor hozd vissza, ha már letelt a hold és stabilan tiszta a képernyő
             if (isPaused && now >= pauseUntil && (now - clearSince) >= CLEAR_STABLE_MS) {
                 toggle(false)
             }
         }
     }
-
 
     private fun toggle(pause: Boolean) {
         val now = System.currentTimeMillis()
@@ -154,8 +171,6 @@ class PermissionWatcherService : AccessibilityService() {
         sendBroadcast(Intent(action).setPackage(packageName))
         Log.d(TAG, if (pause) "PAUSE overlay (a11y)" else "RESUME overlay (a11y)")
     }
-
-    // ——— Detektorok ———
 
     private fun isPermissionUiVisibleFromWindows(): Boolean {
         val ws = windows ?: return false
@@ -180,7 +195,6 @@ class PermissionWatcherService : AccessibilityService() {
 
         if (looksLikePermissionClass(cls)) return true
         if (containsPermissionKeywords(root)) return true
-
         return false
     }
 
@@ -190,13 +204,6 @@ class PermissionWatcherService : AccessibilityService() {
         return PERMISSION_CLASS_HINTS.any { h ->
             simple.contains(h, true) || cls.contains(h, true)
         }
-    }
-
-    private fun looksLikeChromiumDialog(cls: String): Boolean {
-        if (cls.isEmpty()) return false
-        val s = cls.substringAfterLast('.')
-        return s.contains("Dialog", true) || s.contains("Modal", true) || s.contains("Interstitial", true)
-                || cls.contains("Dialog", true) || cls.contains("Modal", true) || cls.contains("Interstitial", true)
     }
 
     private fun containsViewIdSubstring(node: AccessibilityNodeInfo?, needle: String): Boolean {
@@ -215,6 +222,19 @@ class PermissionWatcherService : AccessibilityService() {
         if (pkg in CHROMIUM_PKGS && looksLikeChromiumDialog(cls)) return true
         return looksLikePermissionClass(cls)
     }
+
+    // Add this inside PermissionWatcherService class, near the other helpers
+    private fun looksLikeChromiumDialog(cls: String?): Boolean {
+        if (cls.isNullOrEmpty()) return false
+        val s = cls.substringAfterLast('.')
+        return s.contains("Dialog", true) ||
+                s.contains("Modal", true) ||
+                s.contains("Interstitial", true) ||
+                cls.contains("Dialog", true) ||
+                cls.contains("Modal", true) ||
+                cls.contains("Interstitial", true)
+    }
+
 
     private fun fallbackTextHeuristic(): Boolean {
         val root = rootInActiveWindow ?: return false

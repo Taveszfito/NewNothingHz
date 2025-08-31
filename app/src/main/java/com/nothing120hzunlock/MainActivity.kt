@@ -124,15 +124,15 @@ class MainActivity : ComponentActivity() {
                     Toast.LENGTH_LONG
                 ).show()
                 openOverlaySettings()
-                // Also ask policy to re-evaluate based on false state
-                sendBroadcast(Intent(com.nothing120hzunlock.policy.PolicyReceiver.ACTION_EVAL_POLICY))
+                // policy re-eval (explicit broadcast)
+                evalPolicy()
                 return@setOnCheckedChangeListener
             }
 
             // Save user's intent now that the state is valid
             prefs.edit().putBoolean(KEY_USER_WANTS, isChecked).apply()
             // ask policy to (re)evaluate immediately
-            sendBroadcast(Intent(com.nothing120hzunlock.policy.PolicyReceiver.ACTION_EVAL_POLICY))
+            evalPolicy()
 
             // Temporarily disable switch while service flips
             switchOverlay.isEnabled = false
@@ -176,6 +176,16 @@ class MainActivity : ComponentActivity() {
             ).show()
         }
 
+        // onCreate végén, a többi gomb után:
+        findViewById<Button?>(R.id.btnOpenUsageAccess)?.setOnClickListener {
+            try {
+                startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
+            } catch (_: Exception) {
+                Toast.makeText(this, "Usage Access settings not available on this device.", Toast.LENGTH_SHORT).show()
+            }
+        }
+
+
         // ===== Permission-watcher toggle + quick link =====
         switchPermWatch.isChecked = prefs.getBoolean(KEY_PERM_WATCH, false)
         switchPermWatch.setOnCheckedChangeListener { _, checked ->
@@ -215,7 +225,7 @@ class MainActivity : ComponentActivity() {
             sw.setOnCheckedChangeListener { _, checked ->
                 prefs.edit().putBoolean(KEY_PAUSE_ON_SAVER, checked).apply()
                 // re-evaluate immediately
-                sendBroadcast(Intent(com.nothing120hzunlock.policy.PolicyReceiver.ACTION_EVAL_POLICY))
+                evalPolicy()
                 Toast.makeText(
                     this,
                     if (checked) "Will pause overlay when Battery Saver is active." else "Won't pause on Battery Saver.",
@@ -236,7 +246,7 @@ class MainActivity : ComponentActivity() {
                 prefs.edit().putInt(KEY_BATT_THRESHOLD, pct).apply()
                 if (fromUser) {
                     // re-evaluate immediately when user moves the slider
-                    sendBroadcast(Intent(com.nothing120hzunlock.policy.PolicyReceiver.ACTION_EVAL_POLICY))
+                    evalPolicy()
                 }
             }
         }
@@ -259,8 +269,8 @@ class MainActivity : ComponentActivity() {
                     blacklisted.remove(pkg)
                 }
                 prefs.edit().putStringSet(KEY_BLACKLIST_SET, blacklisted).apply()
-                // ask policy to re-evaluate (useful once blacklist policy is wired)
-                sendBroadcast(Intent(com.nothing120hzunlock.policy.PolicyReceiver.ACTION_EVAL_POLICY))
+                // ask policy to re-evaluate (explicit broadcast)
+                evalPolicy()
             }
         )
         recyclerBlacklist?.adapter = blacklistAdapter
@@ -326,6 +336,13 @@ class MainActivity : ComponentActivity() {
     }
 
     // ===== Helpers: permissions / intents =====
+
+    private fun evalPolicy() {
+        sendBroadcast(
+            Intent(com.nothing120hzunlock.policy.PolicyReceiver.ACTION_EVAL_POLICY)
+                .setPackage(packageName) // explicit broadcast -> non-exported receiver is okay
+        )
+    }
 
     private fun openOverlaySettings() {
         val intent = Intent(
