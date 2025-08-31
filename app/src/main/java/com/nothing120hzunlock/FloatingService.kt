@@ -7,12 +7,17 @@ import android.content.Intent
 import android.content.IntentFilter
 import android.graphics.Color
 import android.graphics.PixelFormat
+import android.os.Build
+import android.os.Handler
 import android.os.IBinder
+import android.os.Looper
+import android.os.PowerManager
 import android.provider.Settings
 import android.view.Gravity
 import android.view.View
 import android.view.WindowManager
-import androidx.core.content.ContextCompat
+import com.nothing120hzunlock.policy.TopAppResolver
+import com.nothing120hzunlock.policy.PolicyReceiver
 
 class FloatingService : Service() {
 
@@ -43,6 +48,42 @@ class FloatingService : Service() {
         }
     }
 
+    override fun onStartCommand(intent: Intent?, flags: Int, startId: Int): Int {
+        // Nem használunk FGS-t, itt nincs teendő.
+        return START_STICKY
+    }
+
+    // ---- Battery Saver / Doze váltás figyelése (azonnali policy-eval) ----
+    private val powerSaveReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            sendBroadcast(
+                Intent(PolicyReceiver.ACTION_EVAL_POLICY).setPackage(packageName)
+            )
+        }
+    }
+
+    // ---- Usage Access polling: top app változás figyelése ----
+    private val pollHandler = Handler(Looper.getMainLooper())
+    private var lastTopPkgPolled: String? = null
+    private val pollRunnable = object : Runnable {
+        override fun run() {
+            try {
+                if (TopAppResolver.hasUsageAccess(this@FloatingService)) {
+                    val top = TopAppResolver.currentTopApp(this@FloatingService)
+                    if (top != lastTopPkgPolled) {
+                        lastTopPkgPolled = top
+                        sendBroadcast(
+                            Intent(PolicyReceiver.ACTION_EVAL_POLICY).setPackage(packageName)
+                        )
+                    }
+                }
+            } finally {
+                // 0.8 s – állítható 500–1000 ms közé
+                pollHandler.postDelayed(this, 800L)
+            }
+        }
+    }
+
     override fun onCreate() {
         super.onCreate()
         isRunning = true
@@ -57,7 +98,6 @@ class FloatingService : Service() {
             /* width  */ 1,
             /* height */ 1,
             WindowManager.LayoutParams.TYPE_APPLICATION_OVERLAY,
-            // fontos: ne legyen fókuszálható és ne fogjon touchot
             WindowManager.LayoutParams.FLAG_NOT_FOCUSABLE or
                     WindowManager.LayoutParams.FLAG_NOT_TOUCHABLE or
                     WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN,
@@ -65,6 +105,8 @@ class FloatingService : Service() {
         ).apply {
             gravity = Gravity.TOP or Gravity.END
             x = 0; y = 0
+            // Ne legyen WM warning a touch-through miatt
+            alpha = 0f
         }
 
         overlayView = View(this).apply {
@@ -75,19 +117,34 @@ class FloatingService : Service() {
 
         addOverlayIfNeeded()
 
+        // Overlay pause/resume üzenetek
         val filter = IntentFilter().apply {
             addAction(ACTION_OVERLAY_PAUSE)
             addAction(ACTION_OVERLAY_RESUME)
             addAction(ACTION_PAUSE_OVERLAY)
             addAction(ACTION_RESUME_OVERLAY)
         }
-        ContextCompat.registerReceiver(
-            this, overlayReceiver, filter,
-            ContextCompat.RECEIVER_NOT_EXPORTED
+        registerReceiverCompat(overlayReceiver, filter)
+
+        // Battery Saver / Doze váltások figyelése
+        val psFilter = IntentFilter().apply {
+            addAction(PowerManager.ACTION_POWER_SAVE_MODE_CHANGED)
+            addAction(PowerManager.ACTION_DEVICE_IDLE_MODE_CHANGED)
+        }
+        registerReceiverCompat(powerSaveReceiver, psFilter)
+
+        // 1) Usage Access poll loop indítása
+        pollHandler.post(pollRunnable)
+
+        // 2) Azonnali policy újraértékelés
+        sendBroadcast(
+            Intent(PolicyReceiver.ACTION_EVAL_POLICY).setPackage(packageName)
         )
     }
 
     override fun onDestroy() {
+        pollHandler.removeCallbacks(pollRunnable)
+        runCatching { unregisterReceiver(powerSaveReceiver) }
         runCatching { unregisterReceiver(overlayReceiver) }
         removeOverlayIfNeeded()
         isRunning = false
@@ -95,6 +152,16 @@ class FloatingService : Service() {
     }
 
     override fun onBind(intent: Intent?): IBinder? = null
+
+    // --- Compat helper a registerReceiver-hez (Android 13+ flag szükséges) ---
+    private fun registerReceiverCompat(receiver: BroadcastReceiver, filter: IntentFilter) {
+        if (Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("DEPRECATION")
+            registerReceiver(receiver, filter)
+        }
+    }
 
     // --- Overlay kezelés ---
 
@@ -110,13 +177,12 @@ class FloatingService : Service() {
     private fun removeOverlayIfNeeded() {
         val v = overlayView
         if (overlayAttached && v != null) {
-            // fontos: immediate
             runCatching { windowManager.removeViewImmediate(v) }
             overlayAttached = false
         }
     }
 
-    /** Accessibility jelzésre azonnal eltüntetjük az overlayt. */
+    /** Jelzésre eltüntetjük az overlayt. */
     private fun pauseOverlay() {
         if (!overlayPaused) {
             removeOverlayIfNeeded()

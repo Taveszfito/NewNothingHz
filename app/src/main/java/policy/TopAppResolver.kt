@@ -1,6 +1,7 @@
 package com.nothing120hzunlock.policy
 
 import android.app.AppOpsManager
+import android.app.usage.UsageEvents
 import android.app.usage.UsageStats
 import android.app.usage.UsageStatsManager
 import android.content.Context
@@ -12,12 +13,10 @@ object TopAppResolver {
 
     private const val TAG = "TopAppResolver"
 
-    /** Ellenőrzi, hogy van-e Usage Access engedély */
+    /** Ellenőrzi, hogy van-e Usage Access engedély (API 26–28-on fallback-kel) */
     fun hasUsageAccess(ctx: Context): Boolean {
         val appOps = ctx.getSystemService(Context.APP_OPS_SERVICE) as AppOpsManager
-
         return if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.Q) {
-            // Android 10+ → van unsafeCheckOpNoThrow
             val mode = appOps.unsafeCheckOpNoThrow(
                 AppOpsManager.OPSTR_GET_USAGE_STATS,
                 Process.myUid(),
@@ -25,35 +24,49 @@ object TopAppResolver {
             )
             mode == AppOpsManager.MODE_ALLOWED
         } else {
-            // Régi Androidon fallback: csak próbálunk usage stats-ot kérni
-            try {
+            // Fallback: próbáljunk usage stat-ot lekérni
+            runCatching {
                 val usm = ctx.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
                 val stats = usm.queryUsageStats(
                     UsageStatsManager.INTERVAL_DAILY,
-                    System.currentTimeMillis() - 1000 * 60,
+                    System.currentTimeMillis() - 60_000,
                     System.currentTimeMillis()
                 )
                 !stats.isNullOrEmpty()
-            } catch (e: Exception) {
-                false
-            }
+            }.getOrDefault(false)
         }
     }
 
-    /** Lekéri a jelenlegi előtérben lévő app package nevét */
+    /** Legutóbbi előtérbe kerülő app csomagneve (részletes eseménynaplóból) */
     fun currentTopApp(ctx: Context): String? {
         return try {
             val usm = ctx.getSystemService(Context.USAGE_STATS_SERVICE) as UsageStatsManager
-            val end = System.currentTimeMillis()
-            val begin = end - 1000 * 30 // 30s history
+            val now = System.currentTimeMillis()
+            val begin = now - 15_000 // 15 mp elég a legutóbbi fg eseményhez
 
-            val stats = usm.queryUsageStats(UsageStatsManager.INTERVAL_DAILY, begin, end)
-            if (stats.isNullOrEmpty()) return null
+            val events = usm.queryEvents(begin, now)
+            val e = UsageEvents.Event()
+            var lastPkg: String? = null
+            var lastTs = -1L
 
-            val recent = stats.maxByOrNull { it.lastTimeUsed }
-            recent?.packageName
-        } catch (e: Exception) {
-            Log.e(TAG, "Failed to get top app", e)
+            while (events.hasNextEvent()) {
+                events.getNextEvent(e)
+                val isFg = when (e.eventType) {
+                    UsageEvents.Event.MOVE_TO_FOREGROUND -> true
+                    else -> if (Build.VERSION.SDK_INT >= 29)
+                        (e.eventType == UsageEvents.Event.ACTIVITY_RESUMED)
+                    else false
+                }
+                if (isFg && !e.packageName.isNullOrEmpty() && e.timeStamp >= lastTs) {
+                    if (e.packageName != "com.android.systemui") { // ne kezeljük „tiltottként” az értesítési sávot/launchert
+                        lastPkg = e.packageName
+                        lastTs = e.timeStamp
+                    }
+                }
+            }
+            lastPkg
+        } catch (t: Throwable) {
+            Log.w(TAG, "currentTopApp failed", t)
             null
         }
     }
