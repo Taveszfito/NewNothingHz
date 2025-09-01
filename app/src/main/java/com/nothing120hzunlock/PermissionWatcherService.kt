@@ -1,7 +1,12 @@
 package com.nothing120hzunlock
 
 import android.accessibilityservice.AccessibilityService
+import android.content.BroadcastReceiver
+import android.content.Context
 import android.content.Intent
+import android.content.IntentFilter
+import android.content.SharedPreferences
+import android.os.Build
 import android.os.Handler
 import android.os.Looper
 import android.util.Log
@@ -68,6 +73,13 @@ class PermissionWatcherService : AccessibilityService() {
             "Install","PackageInstaller","ResolverActivity","ChooserActivity",
             "Dialog","Modal","Interstitial"
         )
+
+        // — Akkumulátor ellenőrzés — //
+        private const val BATTERY_POLL_MS = 10_000L       // folyamatos ellenőrzés: 10 mp-enként
+        private const val PREFS_NAME = "prefs"
+        private val PREF_KEYS_INSTANT_REEVAL = setOf(
+            "battery_threshold_percent", "user_wants_overlay", "pause_on_saver"
+        )
     }
 
     private val main = Handler(Looper.getMainLooper())
@@ -84,6 +96,56 @@ class PermissionWatcherService : AccessibilityService() {
     // debounce a top-app észleléshez
     private var pendingPkg: String? = null
     private var pendingToken = 0
+
+    // —— Akkumulátor figyelés & pref-listener —— //
+    private val prefs by lazy { getSharedPreferences(PREFS_NAME, MODE_PRIVATE) }
+
+    private val batteryReceiver = object : BroadcastReceiver() {
+        override fun onReceive(context: Context?, intent: Intent?) {
+            // Százalék- vagy töltési státusz-változás → azonnali újraértékelés
+            sendBroadcast(
+                Intent("com.nothing120hzunlock.ACTION_EVAL_POLICY").setPackage(packageName)
+            )
+        }
+    }
+
+    private val batteryPollRunnable = object : Runnable {
+        override fun run() {
+            // Folyamatos ellenőrzés akkor is, ha nem ugrik %-ot a kijelzés
+            sendBroadcast(
+                Intent("com.nothing120hzunlock.ACTION_EVAL_POLICY").setPackage(packageName)
+            )
+            main.postDelayed(this, BATTERY_POLL_MS)
+        }
+    }
+
+    private val prefListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
+        if (key != null && key in PREF_KEYS_INSTANT_REEVAL) {
+            // Csúszka/váltó állítása → azonnali újraértékelés
+            sendBroadcast(
+                Intent("com.nothing120hzunlock.ACTION_EVAL_POLICY").setPackage(packageName)
+            )
+        }
+    }
+
+    override fun onServiceConnected() {
+        super.onServiceConnected()
+
+        // Akkumulátor változás (sticky + későbbi változások)
+        val batFilter = IntentFilter().apply { addAction(Intent.ACTION_BATTERY_CHANGED) }
+        registerReceiverCompat(batteryReceiver, batFilter)
+
+        // Pref-változások figyelése (küszöb/csúszka azonnali hatás)
+        prefs.registerOnSharedPreferenceChangeListener(prefListener)
+
+        // Periodikus ellenőrzés indítása
+        main.post(batteryPollRunnable)
+
+        // Kezdő állapot azonnali kiértékelése
+        sendBroadcast(
+            Intent("com.nothing120hzunlock.ACTION_EVAL_POLICY").setPackage(packageName)
+        )
+    }
 
     override fun onAccessibilityEvent(event: AccessibilityEvent?) {
         event ?: return
@@ -135,7 +197,14 @@ class PermissionWatcherService : AccessibilityService() {
     override fun onInterrupt() {}
 
     override fun onDestroy() {
+        // top-app debounce
         main.removeCallbacksAndMessages("top")
+
+        // akku-figyelés takarítás
+        runCatching { unregisterReceiver(batteryReceiver) }
+        main.removeCallbacks(batteryPollRunnable)
+        runCatching { prefs.unregisterOnSharedPreferenceChangeListener(prefListener) }
+
         if (isPaused) sendBroadcast(Intent(ACTION_RESUME).setPackage(packageName))
         super.onDestroy()
     }
@@ -235,7 +304,6 @@ class PermissionWatcherService : AccessibilityService() {
                 cls.contains("Interstitial", true)
     }
 
-
     private fun fallbackTextHeuristic(): Boolean {
         val root = rootInActiveWindow ?: return false
         return containsPermissionKeywords(root)
@@ -251,5 +319,15 @@ class PermissionWatcherService : AccessibilityService() {
     }
 
     private fun isPermWatchOn(): Boolean =
-        getSharedPreferences("prefs", MODE_PRIVATE).getBoolean("perm_watch", true)
+        getSharedPreferences(PREFS_NAME, MODE_PRIVATE).getBoolean("perm_watch", true)
+
+    // --- Compat helper a registerReceiver-hez (Android 13+ flag szükséges) ---
+    private fun registerReceiverCompat(receiver: BroadcastReceiver, filter: IntentFilter) {
+        if (Build.VERSION.SDK_INT >= 33) {
+            registerReceiver(receiver, filter, Context.RECEIVER_NOT_EXPORTED)
+        } else {
+            @Suppress("DEPRECATION")
+            registerReceiver(receiver, filter)
+        }
+    }
 }

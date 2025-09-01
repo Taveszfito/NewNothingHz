@@ -4,6 +4,7 @@ import android.accessibilityservice.AccessibilityServiceInfo
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
+import android.content.ComponentName
 import android.content.Context
 import android.content.Intent
 import android.content.pm.ApplicationInfo
@@ -32,6 +33,7 @@ import androidx.recyclerview.widget.RecyclerView
 import com.google.android.material.slider.Slider
 import com.google.android.material.switchmaterial.SwitchMaterial
 import com.google.android.material.textfield.TextInputEditText
+import com.nothing120hzunlock.policy.PolicyReceiver
 
 class MainActivity : ComponentActivity() {
 
@@ -185,7 +187,6 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-
         // ===== Permission-watcher toggle + quick link =====
         switchPermWatch.isChecked = prefs.getBoolean(KEY_PERM_WATCH, false)
         switchPermWatch.setOnCheckedChangeListener { _, checked ->
@@ -234,14 +235,18 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Threshold slider live value + save
+        // Threshold slider live value + save (+ clamp 0..50)
         sliderBatteryThreshold?.let { slider ->
-            val saved = prefs.getInt(KEY_BATT_THRESHOLD, 0)
-            if (saved in 0..50) slider.value = saved.toFloat()
+            val saved = prefs.getInt(KEY_BATT_THRESHOLD, 0).coerceIn(0, 50)
+            slider.value = saved.toFloat()
             textBatteryThresholdValue?.text = "${slider.value.toInt()}%"
 
             slider.addOnChangeListener { _, value, fromUser ->
-                val pct = value.toInt()
+                val pct = value.toInt().coerceIn(0, 50)
+                if (pct != value.toInt()) {
+                    // ha a layout 0..100-ra van állítva, itt visszacsíptetjük 0..50-re
+                    slider.value = pct.toFloat()
+                }
                 textBatteryThresholdValue?.text = "$pct%"
                 prefs.edit().putInt(KEY_BATT_THRESHOLD, pct).apply()
                 if (fromUser) {
@@ -338,10 +343,11 @@ class MainActivity : ComponentActivity() {
     // ===== Helpers: permissions / intents =====
 
     private fun evalPolicy() {
-        sendBroadcast(
-            Intent(com.nothing120hzunlock.policy.PolicyReceiver.ACTION_EVAL_POLICY)
-                .setPackage(packageName) // explicit broadcast -> non-exported receiver is okay
-        )
+        // Explicit component broadcast → garantált kézbesítés a PolicyReceiver-nek
+        val intent = Intent(PolicyReceiver.ACTION_EVAL_POLICY).apply {
+            component = ComponentName(this@MainActivity, PolicyReceiver::class.java)
+        }
+        sendBroadcast(intent)
     }
 
     private fun openOverlaySettings() {
