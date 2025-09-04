@@ -1,0 +1,43 @@
+2.5
+Bug fix: This site can't ask for your permission error is fixed. 
+The app automatically pauses the overlay if another app requests permission.
+(Due to OS constraints, the pause triggers after the first failed attempt. Try again and it will work.)
+
+New Features:
+--Shortcut buttons for needed permissions:
+-Developer Options
+-Usage Access
+-Accesibility Settings
+
+--Battery Saver Options:
+-Auto disable overlay when battery is below x%
+-Disable overlay when Battery Saver is active
+
+-App Blacklist (Select the applications where you do not want the overlay to be active.)
+-With built in ap search, and toggle to show system apps
+
+-New "Privacy Policy" window (Needed for google play publish in the future) 
+
+-----------------------------------------------
+2.0 
+-Major update: the application has received a UI.
+
+-The app opens even without permissions; you can check/request them in-app.
+
+-Battery optimization exception is optional (recommended to keep ON).
+
+-New Quick Settings tile to control the overlay from anywhere.
+
+-Optional auto-start after boot.
+
+-Automatic system-based dark/light theme.
+
+-“About this app” section with key info.
+
+-New Nothing-style app icon.
+----------------------------------------------
+
+(First version)1.0 (Not available anymore) 
+-No UI, Just grant the 2 permissions required
+(Draw over other apps, Ignore battery optimization)
+and it works.
