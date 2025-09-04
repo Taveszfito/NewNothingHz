@@ -14,12 +14,10 @@
         android:layout_width="match_parent"
         android:layout_height="wrap_content">
 
-        <!-- Felső spacer -->
         <View
             android:layout_width="match_parent"
             android:layout_height="80dp" />
 
-        <!-- Fejléc -->
         <com.google.android.material.textview.MaterialTextView
             android:text="Nothing 120Hz Unlock"
             android:textSize="24sp"
@@ -29,7 +27,6 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"/>
 
-        <!-- OVERLAY KÁRTYA -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -51,7 +48,6 @@
                     android:layout_width="wrap_content"
                     android:layout_height="wrap_content" />
 
-                <!-- Enable overlay -->
                 <LinearLayout
                     android:orientation="horizontal"
                     android:gravity="center_vertical"
@@ -72,48 +68,6 @@
                         android:layout_height="wrap_content" />
                 </LinearLayout>
 
-                <!-- Start on boot -->
-                <LinearLayout
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:layout_marginTop="8dp"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content">
-
-                    <com.google.android.material.textview.MaterialTextView
-                        android:text="Start on boot"
-                        android:textSize="15sp"
-                        android:layout_weight="1"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content" />
-
-                    <com.google.android.material.switchmaterial.SwitchMaterial
-                        android:id="@+id/switchAutostart"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content" />
-                </LinearLayout>
-
-                <!-- Pause overlay during permission prompts -->
-                <LinearLayout
-                    android:orientation="horizontal"
-                    android:gravity="center_vertical"
-                    android:layout_marginTop="8dp"
-                    android:layout_width="match_parent"
-                    android:layout_height="wrap_content">
-
-                    <com.google.android.material.textview.MaterialTextView
-                        android:text="Pause overlay during permission prompts"
-                        android:textSize="15sp"
-                        android:layout_weight="1"
-                        android:layout_width="0dp"
-                        android:layout_height="wrap_content" />
-
-                    <com.google.android.material.switchmaterial.SwitchMaterial
-                        android:id="@+id/switchPermWatch"
-                        android:layout_width="wrap_content"
-                        android:layout_height="wrap_content" />
-                </LinearLayout>
-
                 <com.google.android.material.textview.MaterialTextView
                     android:id="@+id/devOptionsNote"
                     android:layout_width="match_parent"
@@ -126,7 +80,6 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- PERMISSIONS (kinyíló) – már csak a gombok -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -140,7 +93,6 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content">
 
-                <!-- Fejléc: kattintásra nyit/csuk -->
                 <LinearLayout
                     android:id="@+id/permissionsHeader"
                     android:orientation="horizontal"
@@ -166,7 +118,6 @@
                         android:layout_height="24dp" />
                 </LinearLayout>
 
-                <!-- Tartalom -->
                 <LinearLayout
                     android:id="@+id/permissionsContent"
                     android:orientation="vertical"
@@ -199,14 +150,6 @@
                         android:layout_height="wrap_content" />
 
                     <com.google.android.material.button.MaterialButton
-                        android:id="@+id/btnOpenA11y"
-                        android:text="Open Accessibility settings"
-                        style="@style/Widget.Material3.Button.TonalButton"
-                        android:layout_marginTop="8dp"
-                        android:layout_width="match_parent"
-                        android:layout_height="wrap_content" />
-
-                    <com.google.android.material.button.MaterialButton
                         android:id="@+id/btnOpenDevOptions"
                         android:text="Open Developer options"
                         style="@style/Widget.Material3.Button.TonalButton"
@@ -226,7 +169,6 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- BATTERY SAVING (collapsible) -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -240,7 +182,6 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content">
 
-                <!-- Header: tap to expand/collapse -->
                 <LinearLayout
                     android:id="@+id/batteryHeader"
                     android:orientation="horizontal"
@@ -266,7 +207,6 @@
                         android:layout_height="24dp" />
                 </LinearLayout>
 
-                <!-- Content -->
                 <LinearLayout
                     android:id="@+id/batteryContent"
                     android:orientation="vertical"
@@ -275,7 +215,6 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content">
 
-                    <!-- Disable overlay on Battery Saver -->
                     <LinearLayout
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
@@ -295,7 +234,6 @@
                             android:layout_height="wrap_content" />
                     </LinearLayout>
 
-                    <!-- Threshold label -->
                     <com.google.android.material.textview.MaterialTextView
                         android:layout_marginTop="12dp"
                         android:text="Auto-disable overlay when battery is below"
@@ -303,7 +241,6 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content" />
 
-                    <!-- Slider + live value -->
                     <LinearLayout
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
@@ -331,7 +268,6 @@
                             android:layout_height="wrap_content" />
                     </LinearLayout>
 
-                    <!-- Helper text -->
                     <com.google.android.material.textview.MaterialTextView
                         android:id="@+id/textBatteryThresholdHint"
                         android:layout_marginTop="4dp"
@@ -345,7 +281,6 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- APP BLACKLIST (collapsible) -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -359,7 +294,6 @@
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content">
 
-                <!-- Header: tap to expand/collapse -->
                 <LinearLayout
                     android:id="@+id/blacklistHeader"
                     android:orientation="horizontal"
@@ -385,7 +319,6 @@
                         android:layout_height="24dp" />
                 </LinearLayout>
 
-                <!-- Content -->
                 <LinearLayout
                     android:id="@+id/blacklistContent"
                     android:orientation="vertical"
@@ -394,7 +327,6 @@
                     android:layout_width="match_parent"
                     android:layout_height="wrap_content">
 
-                    <!-- Info note -->
                     <com.google.android.material.textview.MaterialTextView
                         android:id="@+id/textBlacklistInfo"
                         android:text="Overlay will automatically pause in the apps you select below."
@@ -403,7 +335,6 @@
                         android:layout_width="match_parent"
                         android:layout_height="wrap_content" />
 
-                    <!-- Search -->
                     <com.google.android.material.textfield.TextInputLayout
                         android:layout_marginTop="12dp"
                         android:layout_width="match_parent"
@@ -418,7 +349,6 @@
                             android:layout_height="wrap_content" />
                     </com.google.android.material.textfield.TextInputLayout>
 
-                    <!-- Show system apps -->
                     <LinearLayout
                         android:orientation="horizontal"
                         android:gravity="center_vertical"
@@ -439,7 +369,6 @@
                             android:layout_height="wrap_content" />
                     </LinearLayout>
 
-                    <!-- App list -->
                     <androidx.recyclerview.widget.RecyclerView
                         android:id="@+id/recyclerBlacklistApps"
                         android:layout_marginTop="8dp"
@@ -447,7 +376,6 @@
                         android:layout_height="wrap_content"
                         android:nestedScrollingEnabled="false" />
 
-                    <!-- Empty state (shown when no results) -->
                     <com.google.android.material.textview.MaterialTextView
                         android:id="@+id/textBlacklistEmpty"
                         android:visibility="gone"
@@ -462,8 +390,6 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-
-        <!-- ABOUT (kinyíló) -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -521,7 +447,6 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- PRIVACY POLICY (kinyíló) -->
         <com.google.android.material.card.MaterialCardView
             android:layout_width="match_parent"
             android:layout_height="wrap_content"
@@ -571,11 +496,12 @@
                     <com.google.android.material.textview.MaterialTextView
                         android:id="@+id/privacyText"
                         android:text="Privacy Policy (short)
-– The app runs fully offline and collects no personal data.
+– The app works entirely offline and does not collect any personal data.
 – No analytics, no ads, no third-party SDKs.
-– Permissions are used only to keep 120 Hz (overlay), optionally auto-pause the overlay during system permission dialogs (Accessibility), optionally start on boot, and optionally request battery optimization exemption.
+– Permissions are required only for the app’s intended features. If the necessary permissions are not granted, some core functions may not work, or the app may close automatically due to power-saving restrictions.
 – Nothing is stored or shared.
-– You can read the full Privacy Policy here: https://tinyurl.com/ypwn6jfj
+– Full Privacy Policy: https://tinyurl.com/ypwn6jfj
+
 – Contact: boysenberry1226@gmail.com"
                         android:textSize="14sp"
                         android:textColor="?android:attr/textColorSecondary"
@@ -585,7 +511,6 @@
             </LinearLayout>
         </com.google.android.material.card.MaterialCardView>
 
-        <!-- Footer -->
         <TextView
             android:id="@+id/footer"
             android:layout_width="match_parent"

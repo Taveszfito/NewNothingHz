@@ -1,6 +1,5 @@
 package com.nothing120hzunlock
 
-import android.accessibilityservice.AccessibilityServiceInfo
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.animation.ValueAnimator
@@ -19,7 +18,6 @@ import android.text.Editable
 import android.text.TextWatcher
 import android.view.View
 import android.view.ViewGroup
-import android.view.accessibility.AccessibilityManager
 import android.view.animation.AccelerateDecelerateInterpolator
 import android.widget.Button
 import android.widget.ImageView
@@ -34,111 +32,93 @@ import com.google.android.material.slider.Slider
 import com.google.android.material.switchmaterial.SwitchMaterial
 import com.google.android.material.textfield.TextInputEditText
 import com.nothing120hzunlock.policy.PolicyReceiver
+import com.nothing120hzunlock.onboarding.OnboardingActivity   // <-- IMPORT az onboardinghoz
 
 class MainActivity : ComponentActivity() {
 
-    // === Existing views ===
     private lateinit var switchOverlay: SwitchMaterial
     private lateinit var statusText: TextView
     private lateinit var btnCheckOverlay: Button
     private lateinit var btnRequestOverlay: Button
     private lateinit var btnBatteryOpt: Button
-    private lateinit var switchAutostart: SwitchMaterial
-    private lateinit var switchPermWatch: SwitchMaterial
-    private lateinit var btnOpenA11y: Button
 
-    // === New: Battery Saving section views ===
     private var switchPauseOnSaver: SwitchMaterial? = null
     private var sliderBatteryThreshold: Slider? = null
     private var textBatteryThresholdValue: TextView? = null
 
-    // === New: App Blacklist section views ===
     private var blacklistSearchInput: TextInputEditText? = null
     private var switchShowSystemApps: SwitchMaterial? = null
     private var recyclerBlacklist: RecyclerView? = null
     private var textBlacklistEmpty: TextView? = null
 
-    // === Adapter/data ===
     private val allApps = mutableListOf<AppEntry>()
     private val filteredApps = mutableListOf<AppEntry>()
     private lateinit var blacklistAdapter: AppListAdapter
 
-    // === Flags ===
-    private var suppressPermWatchChange = false
     private var suppressSwitchCallback = false
 
-    // === Pref keys ===
     private val PREFS = "prefs"
-    private val KEY_AUTOSTART = "autostart"
-    private val KEY_PERM_WATCH = "perm_watch"
     private val KEY_PAUSE_ON_SAVER = "pause_on_saver"
-    private val KEY_BATT_THRESHOLD = "battery_threshold_percent" // int 0..50 (0 = off)
-    private val KEY_BLACKLIST_SET = "blacklist_packages" // string set
-    private val KEY_SHOW_SYSTEM = "show_system_apps" // bool
+    private val KEY_BATT_THRESHOLD = "battery_threshold_percent"
+    private val KEY_BLACKLIST_SET = "blacklist_packages"
+    private val KEY_SHOW_SYSTEM = "show_system_apps"
     private val KEY_USER_WANTS = "user_wants_overlay"
 
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
+
+        // === FIRST-RUN ONBOARDING GATE ===
+        val firstRunDone = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
+            .getBoolean("onboarded_v1", false)
+        if (!firstRunDone) {
+            startActivity(Intent(this, OnboardingActivity::class.java))
+            // Nem zárjuk be a MainActivity-t; visszatérés után innen folytatódik.
+        }
+
         setContentView(R.layout.activity_main)
 
-        // ====== Existing bindings ======
         switchOverlay     = findViewById(R.id.switchOverlay)
         statusText        = findViewById(R.id.statusText)
         btnCheckOverlay   = findViewById(R.id.btnCheckOverlay)
         btnRequestOverlay = findViewById(R.id.btnRequestOverlay)
         btnBatteryOpt     = findViewById(R.id.btnBatteryOpt)
-        switchAutostart   = findViewById(R.id.switchAutostart)
-        switchPermWatch   = findViewById(R.id.switchPermWatch)
-        btnOpenA11y       = findViewById(R.id.btnOpenA11y)
         findViewById<Button?>(R.id.btnOpenDevOptions)?.setOnClickListener { openDeveloperOptions() }
 
-        // ====== New bindings (Battery Saving) ======
         switchPauseOnSaver        = findViewById(R.id.switchPauseOnSaver)
         sliderBatteryThreshold    = findViewById(R.id.sliderBatteryThreshold)
         textBatteryThresholdValue = findViewById(R.id.textBatteryThresholdValue)
 
-        // ====== New bindings (App Blacklist) ======
         blacklistSearchInput   = findViewById(R.id.inputBlacklistSearch)
         switchShowSystemApps   = findViewById(R.id.switchShowSystemApps)
         recyclerBlacklist      = findViewById(R.id.recyclerBlacklistApps)
         textBlacklistEmpty     = findViewById(R.id.textBlacklistEmpty)
 
-        // ====== Initial UI sync ======
         syncUi()
 
         val prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
 
-        // ----- Overlay ON/OFF -----
         switchOverlay.setOnCheckedChangeListener { _, isChecked ->
             if (suppressSwitchCallback) return@setOnCheckedChangeListener
 
-            // Guard: permission must exist to turn ON
             if (isChecked && !Settings.canDrawOverlays(this)) {
-                // Ensure pref stays false if permission missing
                 prefs.edit().putBoolean(KEY_USER_WANTS, false).apply()
                 suppressSwitchCallback = true
                 switchOverlay.isChecked = false
                 suppressSwitchCallback = false
-
                 Toast.makeText(
                     this,
                     "To enable the overlay, allow “Display over other apps” for this app first.",
                     Toast.LENGTH_LONG
                 ).show()
                 openOverlaySettings()
-                // policy re-eval (explicit broadcast)
                 evalPolicy()
                 return@setOnCheckedChangeListener
             }
 
-            // Save user's intent now that the state is valid
             prefs.edit().putBoolean(KEY_USER_WANTS, isChecked).apply()
-            // ask policy to (re)evaluate immediately
             evalPolicy()
 
-            // Temporarily disable switch while service flips
             switchOverlay.isEnabled = false
-
             if (isChecked) {
                 startService(Intent(this, FloatingService::class.java))
                 Toast.makeText(this, "120Hz unlocked", Toast.LENGTH_SHORT).show()
@@ -153,7 +133,6 @@ class MainActivity : ComponentActivity() {
             }, 200)
         }
 
-        // ----- Overlay permission check/request -----
         btnCheckOverlay.setOnClickListener {
             val ok = Settings.canDrawOverlays(this)
             Toast.makeText(
@@ -164,21 +143,8 @@ class MainActivity : ComponentActivity() {
         }
         btnRequestOverlay.setOnClickListener { openOverlaySettings() }
 
-        // ----- Battery optimization exception -----
         btnBatteryOpt.setOnClickListener { requestBatteryOptException() }
 
-        // ----- Autostart toggle -----
-        switchAutostart.isChecked = prefs.getBoolean(KEY_AUTOSTART, false)
-        switchAutostart.setOnCheckedChangeListener { _, checked ->
-            prefs.edit().putBoolean(KEY_AUTOSTART, checked).apply()
-            Toast.makeText(
-                this,
-                if (checked) "Auto-start enabled." else "Auto-start disabled.",
-                Toast.LENGTH_SHORT
-            ).show()
-        }
-
-        // onCreate végén, a többi gomb után:
         findViewById<Button?>(R.id.btnOpenUsageAccess)?.setOnClickListener {
             try {
                 startActivity(Intent(Settings.ACTION_USAGE_ACCESS_SETTINGS))
@@ -187,45 +153,10 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // ===== Permission-watcher toggle + quick link =====
-        switchPermWatch.isChecked = prefs.getBoolean(KEY_PERM_WATCH, false)
-        switchPermWatch.setOnCheckedChangeListener { _, checked ->
-            if (suppressPermWatchChange) return@setOnCheckedChangeListener
-
-            if (checked) {
-                if (!isAccessibilityEnabled()) {
-                    suppressPermWatchChange = true
-                    switchPermWatch.isChecked = false
-                    suppressPermWatchChange = false
-                    Toast.makeText(
-                        this,
-                        "To use auto-pause, enable the app’s Accessibility service first.",
-                        Toast.LENGTH_LONG
-                    ).show()
-                } else {
-                    prefs.edit().putBoolean(KEY_PERM_WATCH, true).apply()
-                    Toast.makeText(this, "Permission-watcher ON", Toast.LENGTH_SHORT).show()
-                }
-            } else {
-                prefs.edit().putBoolean(KEY_PERM_WATCH, false).apply()
-                Toast.makeText(this, "Permission-watcher OFF", Toast.LENGTH_SHORT).show()
-            }
-        }
-        btnOpenA11y.setOnClickListener {
-            runCatching {
-                startActivity(Intent(Settings.ACTION_ACCESSIBILITY_SETTINGS))
-            }.onFailure {
-                Toast.makeText(this, "Accessibility settings not available on this device.", Toast.LENGTH_SHORT).show()
-            }
-        }
-
-        // === NEW: Battery Saving bindings ===
-        // Pause on Battery Saver
         switchPauseOnSaver?.let { sw ->
             sw.isChecked = prefs.getBoolean(KEY_PAUSE_ON_SAVER, false)
             sw.setOnCheckedChangeListener { _, checked ->
                 prefs.edit().putBoolean(KEY_PAUSE_ON_SAVER, checked).apply()
-                // re-evaluate immediately
                 evalPolicy()
                 Toast.makeText(
                     this,
@@ -235,29 +166,19 @@ class MainActivity : ComponentActivity() {
             }
         }
 
-        // Threshold slider live value + save (+ clamp 0..50)
         sliderBatteryThreshold?.let { slider ->
             val saved = prefs.getInt(KEY_BATT_THRESHOLD, 0).coerceIn(0, 50)
             slider.value = saved.toFloat()
             textBatteryThresholdValue?.text = "${slider.value.toInt()}%"
-
             slider.addOnChangeListener { _, value, fromUser ->
                 val pct = value.toInt().coerceIn(0, 50)
-                if (pct != value.toInt()) {
-                    // ha a layout 0..100-ra van állítva, itt visszacsíptetjük 0..50-re
-                    slider.value = pct.toFloat()
-                }
+                if (pct != value.toInt()) slider.value = pct.toFloat()
                 textBatteryThresholdValue?.text = "$pct%"
                 prefs.edit().putInt(KEY_BATT_THRESHOLD, pct).apply()
-                if (fromUser) {
-                    // re-evaluate immediately when user moves the slider
-                    evalPolicy()
-                }
+                if (fromUser) evalPolicy()
             }
         }
 
-        // === NEW: Blacklist list + search ===
-        // RecyclerView setup
         recyclerBlacklist?.apply {
             layoutManager = LinearLayoutManager(this@MainActivity)
             setHasFixedSize(false)
@@ -268,19 +189,13 @@ class MainActivity : ComponentActivity() {
             data = filteredApps,
             isBlacklisted = { pkg -> pkg in blacklisted },
             onToggle = { pkg, makeBlacklisted ->
-                if (makeBlacklisted) {
-                    blacklisted.add(pkg)
-                } else {
-                    blacklisted.remove(pkg)
-                }
+                if (makeBlacklisted) blacklisted.add(pkg) else blacklisted.remove(pkg)
                 prefs.edit().putStringSet(KEY_BLACKLIST_SET, blacklisted).apply()
-                // ask policy to re-evaluate (explicit broadcast)
                 evalPolicy()
             }
         )
         recyclerBlacklist?.adapter = blacklistAdapter
 
-        // Show system apps toggle
         val showSys = prefs.getBoolean(KEY_SHOW_SYSTEM, false)
         switchShowSystemApps?.isChecked = showSys
         switchShowSystemApps?.setOnCheckedChangeListener { _, checked ->
@@ -291,7 +206,6 @@ class MainActivity : ComponentActivity() {
             )
         }
 
-        // Search field
         blacklistSearchInput?.addTextChangedListener(object : TextWatcher {
             override fun beforeTextChanged(s: CharSequence?, start: Int, count: Int, after: Int) {}
             override fun afterTextChanged(s: Editable?) {}
@@ -303,35 +217,21 @@ class MainActivity : ComponentActivity() {
             }
         })
 
-        // Load apps in background once the section exists (loading is cheap, but do it async)
         loadAppsAsync {
-            // After load, apply initial filter
             filterAndShowApps(
                 query = blacklistSearchInput?.text?.toString().orEmpty(),
                 showSystem = switchShowSystemApps?.isChecked ?: false
             )
         }
 
-        // --- Expandable sections (add new sections too) ---
         setupExpandableSections()
     }
 
     override fun onResume() {
         super.onResume()
         syncUi()
-
-        val prefs = getSharedPreferences(PREFS, Context.MODE_PRIVATE)
-        val wanted = prefs.getBoolean(KEY_PERM_WATCH, false)
-        if (wanted && !isAccessibilityEnabled()) {
-            Toast.makeText(
-                this,
-                "Accessibility service is OFF — auto-pause won't run until you enable it.",
-                Toast.LENGTH_SHORT
-            ).show()
-        }
     }
 
-    /** Keep overlay switch & status in sync with service. */
     private fun syncUi() {
         val running = FloatingService.isRunning
         suppressSwitchCallback = true
@@ -340,10 +240,7 @@ class MainActivity : ComponentActivity() {
         statusText.text = if (running) "Overlay: ON" else "Overlay: OFF"
     }
 
-    // ===== Helpers: permissions / intents =====
-
     private fun evalPolicy() {
-        // Explicit component broadcast → garantált kézbesítés a PolicyReceiver-nek
         val intent = Intent(PolicyReceiver.ACTION_EVAL_POLICY).apply {
             component = ComponentName(this@MainActivity, PolicyReceiver::class.java)
         }
@@ -386,20 +283,7 @@ class MainActivity : ComponentActivity() {
         }
     }
 
-    private fun isAccessibilityEnabled(): Boolean {
-        return try {
-            val am = getSystemService(Context.ACCESSIBILITY_SERVICE) as AccessibilityManager
-            val list = am.getEnabledAccessibilityServiceList(AccessibilityServiceInfo.FEEDBACK_ALL_MASK)
-            list.any { it.resolveInfo?.serviceInfo?.packageName == packageName }
-        } catch (_: Exception) {
-            false
-        }
-    }
-
-    // ===== Expandable card wiring =====
-
     private fun setupExpandableSections() {
-        // Permissions
         runCatching {
             val header  = findViewById<View>(R.id.permissionsHeader)
             val content = findViewById<View>(R.id.permissionsContent)
@@ -407,8 +291,6 @@ class MainActivity : ComponentActivity() {
             chev.rotation = if (content.visibility == View.VISIBLE) 180f else 0f
             header.setOnClickListener { toggleSectionAnimated(content, chev) }
         }
-
-        // Battery Saving (NEW)
         runCatching {
             val header  = findViewById<View>(R.id.batteryHeader)
             val content = findViewById<View>(R.id.batteryContent)
@@ -416,8 +298,6 @@ class MainActivity : ComponentActivity() {
             chev.rotation = if (content.visibility == View.VISIBLE) 180f else 0f
             header.setOnClickListener { toggleSectionAnimated(content, chev) }
         }
-
-        // App Blacklist (NEW)
         runCatching {
             val header  = findViewById<View>(R.id.blacklistHeader)
             val content = findViewById<View>(R.id.blacklistContent)
@@ -425,8 +305,6 @@ class MainActivity : ComponentActivity() {
             chev.rotation = if (content.visibility == View.VISIBLE) 180f else 0f
             header.setOnClickListener { toggleSectionAnimated(content, chev) }
         }
-
-        // About
         runCatching {
             val header  = findViewById<View>(R.id.aboutHeader)
             val content = findViewById<View>(R.id.aboutContent)
@@ -434,8 +312,6 @@ class MainActivity : ComponentActivity() {
             chev.rotation = if (content.visibility == View.VISIBLE) 180f else 0f
             header.setOnClickListener { toggleSectionAnimated(content, chev) }
         }
-
-        // Privacy
         runCatching {
             val header  = findViewById<View>(R.id.privacyHeader)
             val content = findViewById<View>(R.id.privacyContent)
@@ -521,15 +397,11 @@ class MainActivity : ComponentActivity() {
         anim.start()
     }
 
-    // ===== App list loading & adapter =====
-
     private fun loadAppsAsync(onDone: () -> Unit) {
-        // Heavy-ish query: do it off the main thread
         Thread {
             try {
                 val pm = packageManager
                 val apps = pm.getInstalledApplications(0)
-
                 val list = apps.mapNotNull { ai ->
                     try {
                         val label = pm.getApplicationLabel(ai)?.toString() ?: ai.packageName
@@ -552,7 +424,6 @@ class MainActivity : ComponentActivity() {
             } catch (_: Exception) {
                 allApps.clear()
             }
-
             Handler(Looper.getMainLooper()).post { onDone() }
         }.start()
     }
@@ -577,7 +448,6 @@ class MainActivity : ComponentActivity() {
         blacklistAdapter.notifyDataSetChanged()
     }
 
-    // Data for each app row
     data class AppEntry(
         val packageName: String,
         val appName: String,
@@ -586,7 +456,6 @@ class MainActivity : ComponentActivity() {
         val isBlacklisted: Boolean = false
     )
 
-    // Simple Material-like row: icon | (title + subtitle) | switch
     inner class AppListAdapter(
         private val data: MutableList<AppEntry>,
         private val isBlacklisted: (String) -> Boolean,
