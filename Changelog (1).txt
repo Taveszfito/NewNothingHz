@@ -1,3 +1,10 @@
+3.0
+Setup wizard added on the first lauch
+Removed: Auto Start on boot
+         Accessibility service
+         Accessibility Shortcut button
+Accessibility services are no longer required for the app to continue to function.
+--------------------------------
 2.6
 -Battery% based pausing now actually works.
 -Autopause during permission granting now works the first time. No need for a failed attempt anymore.
