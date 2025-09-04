@@ -1,3 +1,7 @@
+2.6
+-Battery% based pausing now actually works.
+-Autopause during permission granting now works the first time. No need for a failed attempt anymore.
+---------------------------------------------------
 2.5
 Bug fix: This site can't ask for your permission error is fixed. 
 The app automatically pauses the overlay if another app requests permission.
